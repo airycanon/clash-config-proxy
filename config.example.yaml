@@ -1,0 +1,20 @@
+remote: https://clash.yml
+port: 8080
+token: xxx
+
+proxies:
+  - name: xxx
+    type: http
+    server: xxx
+    port: xxx
+
+rules:
+  - DOMAIN-SUFFIX,xxx
+
+rule-providers:
+reject:
+  type: xxx
+  behavior: xxx
+  url: "xxx"
+  path: ./ruleset/xxx.yaml
+  interval: 86400

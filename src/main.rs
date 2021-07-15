@@ -67,8 +67,17 @@ impl RuleProvider {
 }
 
 
+#[derive(Deserialize)]
+pub struct Query {
+    token: String,
+}
+
 #[get("/config.yaml")]
-async fn index(config: web::Data<Config>) -> impl Responder {
+async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) -> impl Responder {
+    if query.token != config.token {
+        return HttpResponse::NotFound().finish()
+    }
+
     // load remote config
     let client = Client::default();
 

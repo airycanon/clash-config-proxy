@@ -12,9 +12,9 @@ rules:
   - DOMAIN-SUFFIX,xxx
 
 rule-providers:
-reject:
-  type: xxx
-  behavior: xxx
-  url: "xxx"
-  path: ./ruleset/xxx.yaml
-  interval: 86400
+  reject:
+    type: xxx
+    behavior: xxx
+    url: "xxx"
+    path: ./ruleset/xxx.yaml
+    interval: 86400

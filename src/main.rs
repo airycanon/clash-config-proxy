@@ -40,27 +40,31 @@ struct RuleProvider {
 }
 
 impl Proxy {
-    pub fn to_map(self) -> Mapping {
+    pub fn to_map(&self) -> Mapping {
+        let clone = self.clone();
+
         let mut map = Mapping::new();
-        map.insert(Value::String("name".to_string()), Value::String(self.name));
-        map.insert(Value::String("type".to_string()), Value::String(self.protocol));
-        map.insert(Value::String("username".to_string()), Value::String(self.username));
-        map.insert(Value::String("password".to_string()), Value::String(self.password));
-        map.insert(Value::String("server".to_string()), Value::String(self.server));
-        map.insert(Value::String("port".to_string()), Value::Number(Number::from(self.port)));
+        map.insert(Value::String("name".to_string()), Value::String(clone.name));
+        map.insert(Value::String("type".to_string()), Value::String(clone.protocol));
+        map.insert(Value::String("username".to_string()), Value::String(clone.username));
+        map.insert(Value::String("password".to_string()), Value::String(clone.password));
+        map.insert(Value::String("server".to_string()), Value::String(clone.server));
+        map.insert(Value::String("port".to_string()), Value::Number(Number::from(clone.port)));
 
         map
     }
 }
 
 impl RuleProvider {
-    pub fn to_map(self) -> Mapping {
+    pub fn to_map(&self) -> Mapping {
+        let clone = self.clone();
+
         let mut map = Mapping::new();
-        map.insert(Value::String("type".to_string()), Value::String(self.protocol));
-        map.insert(Value::String("behavior".to_string()), Value::String(self.behavior));
-        map.insert(Value::String("url".to_string()), Value::String(self.url));
-        map.insert(Value::String("path".to_string()), Value::String(self.path));
-        map.insert(Value::String("interval".to_string()), Value::Number(Number::from(self.interval)));
+        map.insert(Value::String("type".to_string()), Value::String(clone.protocol));
+        map.insert(Value::String("behavior".to_string()), Value::String(clone.behavior));
+        map.insert(Value::String("url".to_string()), Value::String(clone.url));
+        map.insert(Value::String("path".to_string()), Value::String(clone.path));
+        map.insert(Value::String("interval".to_string()), Value::Number(Number::from(clone.interval)));
 
         map
     }
@@ -75,7 +79,7 @@ pub struct Query {
 #[get("/config.yaml")]
 async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) -> impl Responder {
     if query.token != config.token {
-        return HttpResponse::NotFound().finish()
+        return HttpResponse::NotFound().finish();
     }
 
     // load remote config
@@ -100,11 +104,11 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     let mut new_proxies = vec![];
     for proxy in config.proxies.clone().into_iter() {
         new_proxies.push(Value::Mapping(proxy.to_map()));
-
-        for v in proxies.clone().into_iter() {
-            new_proxies.push(v)
-        }
     }
+    for v in proxies.clone().into_iter() {
+        new_proxies.push(v)
+    }
+
     map.insert("proxies".to_string(), Value::Sequence(new_proxies));
 
     // prepend rules
@@ -116,11 +120,11 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     let mut new_rules = vec![];
     for rule in config.rules.clone().into_iter() {
         new_rules.push(Value::String(rule));
-
-        for v in rules.clone().into_iter() {
-            new_rules.push(v)
-        }
     }
+    for v in rules.clone().into_iter() {
+        new_rules.push(v)
+    }
+
     map.insert("rules".to_string(), Value::Sequence(new_rules));
 
     // prepend rule-providers
@@ -132,11 +136,11 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     let mut new_rule_providers = Mapping::new();
     for (k, v) in config.rule_providers.clone().into_iter() {
         new_rule_providers.insert(Value::String(k), Value::Mapping(v.to_map()));
-
-        for (k, v) in rule_providers.clone().into_iter() {
-            new_rule_providers.insert(k, v);
-        }
     }
+    for (k, v) in rule_providers.clone().into_iter() {
+        new_rule_providers.insert(k, v);
+    }
+
     map.insert("rule-providers".to_string(), Value::Mapping(new_rule_providers));
 
     let yaml = serde_yaml::to_string(&map).unwrap();
@@ -150,7 +154,7 @@ async fn main() -> std::io::Result<()> {
 
     let config: Config = serde_yaml::from_str(contents.as_str()).unwrap_or_default();
 
-    let addr = format!("127.0.0.1:{}", config.port);
+    let addr = format!("0.0.0.0:{}", config.port);
     println!("start server at {}", addr);
 
     HttpServer::new(move || App::new()

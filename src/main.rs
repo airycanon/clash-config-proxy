@@ -74,6 +74,7 @@ impl RuleProvider {
 #[derive(Deserialize)]
 pub struct Query {
     token: String,
+    disable: Option<bool>,
 }
 
 #[get("/config.yaml")]
@@ -81,6 +82,8 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     if query.token != config.token {
         return HttpResponse::NotFound().finish();
     }
+
+   let disabled = query.disable.unwrap_or(false);
 
     // load remote config
     let client = Client::default();
@@ -102,9 +105,12 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     }
 
     let mut new_proxies = vec![];
-    for proxy in config.proxies.clone().into_iter() {
-        new_proxies.push(Value::Mapping(proxy.to_map()));
+    if !disabled {
+        for proxy in config.proxies.clone().into_iter() {
+            new_proxies.push(Value::Mapping(proxy.to_map()));
+        }
     }
+
     for v in proxies.clone().into_iter() {
         new_proxies.push(v)
     }
@@ -118,9 +124,12 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     }
 
     let mut new_rules = vec![];
-    for rule in config.rules.clone().into_iter() {
-        new_rules.push(Value::String(rule));
+    if !disabled {
+        for rule in config.rules.clone().into_iter() {
+            new_rules.push(Value::String(rule));
+        }
     }
+
     for v in rules.clone().into_iter() {
         new_rules.push(v)
     }
@@ -134,9 +143,12 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
     }
 
     let mut new_rule_providers = Mapping::new();
-    for (k, v) in config.rule_providers.clone().into_iter() {
-        new_rule_providers.insert(Value::String(k), Value::Mapping(v.to_map()));
+    if !disabled {
+        for (k, v) in config.rule_providers.clone().into_iter() {
+            new_rule_providers.insert(Value::String(k), Value::Mapping(v.to_map()));
+        }
     }
+
     for (k, v) in rule_providers.clone().into_iter() {
         new_rule_providers.insert(k, v);
     }

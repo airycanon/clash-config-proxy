@@ -1,0 +1,113 @@
+name: Build Releases
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    env:
+      RUST_BACKTRACE: full
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - aarch64-unknown-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: ${{ matrix.target }}
+          toolchain: nightly
+          default: true
+          override: true
+
+      - name: Install cross
+        run: cargo install cross
+
+      - name: Build ${{ matrix.target }}
+        timeout-minutes: 120
+        run: |
+          cross build --release --target ${{ matrix.target }}
+          
+      - name: Build Test
+        run: |
+          ls -al target/release/
+
+      - name: Package ${{ matrix.target }}
+        run: |
+          cd target/${{ matrix.target }}/release && tar -cJf clash-config-proxy.${{ matrix.target }}.tar.xz clash-config-proxy 
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: target/${{ matrix.target }}/release/*.tar.xz
+
+  build-darwin:
+    runs-on: macos-latest
+    env:
+      RUST_BACKTRACE: full
+    strategy:
+      matrix:
+        target:
+          - aarch64-apple-darwin
+          - x86_64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: ${{ matrix.target }}
+          toolchain: nightly
+          default: true
+          override: true
+
+      - name: Install xcode-select
+        if: ${{ matrix.target }} == 'aarch64-apple-darwin'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_12.4.app &&
+          sudo rm -Rf /Library/Developer/CommandLineTools/SDKs/*
+
+      - name: Install GNU tar
+        if: runner.os == 'macOS'
+        run: |
+          brew install gnu-tar
+          # echo "::add-path::/usr/local/opt/gnu-tar/libexec/gnubin"
+          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+
+      - name: Build ${{ matrix.target }}
+        timeout-minutes: 120
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Build Test
+        run: |
+          ls -al target/${{ matrix.target }}/release/
+
+      - name: Package ${{ matrix.target }}
+        run: |
+          cd target/${{ matrix.target }}/release && tar -cJf clash-config-proxy.${{ matrix.target }}.tar.xz clash-config-proxy 
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: target/${{ matrix.target }}/release/*.tar.xz

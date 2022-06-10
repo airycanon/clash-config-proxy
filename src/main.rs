@@ -1,7 +1,7 @@
-use actix_web::{get, web, App, HttpServer, Responder, Error, HttpResponse};
+use actix_web::{get, web, App, HttpServer, Responder, HttpResponse};
 use std::fs;
 use serde::{Serialize, Deserialize};
-use actix_web::client::Client;
+use awc::Client;
 use serde_yaml::{Value, Mapping, Number};
 use std::collections::BTreeMap;
 
@@ -92,8 +92,11 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
         .get(config.remote.as_str())
         .send()
         .await
-        .map_err(Error::from)
         .unwrap();
+
+    if !resp.status().is_success() {
+        return HttpResponse::InternalServerError().finish();
+    }
 
     let body = String::from_utf8(resp.body().await.unwrap().to_vec()).unwrap();
     let mut map: BTreeMap<String, Value> = serde_yaml::from_str(body.as_str()).unwrap();
@@ -170,7 +173,7 @@ async fn main() -> std::io::Result<()> {
     println!("start server at {}", addr);
 
     HttpServer::new(move || App::new()
-        .data(config.clone())
+        .app_data( web::Data::new(config.clone()))
         .service(index))
         .bind(addr)?
         .run()

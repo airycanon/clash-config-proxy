@@ -5,7 +5,7 @@ Clash-config-proxy is a http proxy for [ClashX](https://github.com/yichengchen/c
 
 ### Server config
 
-* remote a third-party config url
+* sources third-party config urls
 * port proxy server port
 * token using for authorization
 

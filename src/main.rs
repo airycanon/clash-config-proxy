@@ -1,13 +1,14 @@
-use actix_web::{get, web, App, HttpServer, Responder, HttpResponse};
-use std::fs;
-use serde::{Serialize, Deserialize};
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use awc::Client;
-use serde_yaml::{Value, Mapping, Number};
+use serde::{Deserialize, Serialize};
+use serde_yaml::{Mapping, Number, Value};
 use std::collections::BTreeMap;
+use std::fs;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 struct Config {
-    remote: String,
+    #[serde(default)]
+    sources: Vec<String>,
     port: i32,
     token: String,
     #[serde(default)]
@@ -70,7 +71,6 @@ impl RuleProvider {
     }
 }
 
-
 #[derive(Deserialize)]
 pub struct Query {
     token: String,
@@ -83,82 +83,81 @@ async fn index(config: web::Data<Config>, web::Query(query): web::Query<Query>) 
         return HttpResponse::NotFound().finish();
     }
 
-   let disabled = query.disable.unwrap_or(false);
+    let disabled = query.disable.unwrap_or(false);
+
+    let mut proxies = vec![];
+    let mut rules = vec![];
+    let mut rule_providers = Mapping::new();
+
+    let mut all:BTreeMap<String, Value>  = BTreeMap::new();
+
+    // prepend local config
+    if !disabled {
+        for proxy in config.proxies.clone().into_iter() {
+            proxies.push(Value::Mapping(proxy.to_map()));
+        }
+        for rule in config.rules.clone().into_iter() {
+            rules.push(Value::String(rule));
+        }
+        for (k, v) in config.rule_providers.clone().into_iter() {
+            rule_providers.insert(Value::String(k), Value::Mapping(v.to_map()));
+        }
+    }
 
     // load remote config
     let client = Client::default();
 
-    let mut resp = client
-        .get(config.remote.as_str())
-        .send()
-        .await
-        .unwrap();
+    let mut sources = config.sources.clone();
+    sources.dedup();
 
-    if !resp.status().is_success() {
-        return HttpResponse::InternalServerError().finish();
-    }
+    for remote in sources.into_iter() {
+        let mut resp = client.get(remote.as_str()).send().await.unwrap();
 
-    let body = String::from_utf8(resp.body().await.unwrap().to_vec()).unwrap();
-    let mut map: BTreeMap<String, Value> = serde_yaml::from_str(body.as_str()).unwrap();
+        if !resp.status().is_success() {
+            return HttpResponse::InternalServerError().finish();
+        }
 
-    // prepend proxies
-    let mut proxies = vec![];
-    if map.contains_key("proxies") {
-        proxies = map["proxies"].as_sequence().unwrap().to_owned();
-    }
+        let body = String::from_utf8(resp.body().await.unwrap().to_vec()).unwrap();
+        let resp: BTreeMap<String, Value> = serde_yaml::from_str(body.as_str()).unwrap();
 
-    let mut new_proxies = vec![];
-    if !disabled {
-        for proxy in config.proxies.clone().into_iter() {
-            new_proxies.push(Value::Mapping(proxy.to_map()));
+        // same config in next config yml will be ignored 
+        for (k, v) in resp.clone().into_iter() {
+            all.entry(k).or_insert(v);
+        }
+
+        // prepend remote proxies
+        let mut remote_proxies = vec![];
+        if resp.contains_key("proxies") {
+            remote_proxies = resp["proxies"].as_sequence().unwrap().to_owned();
+        }
+        for v in remote_proxies.clone().into_iter() {
+            proxies.push(v)
+        }
+
+        // prepend remote rules
+        let mut remote_rules = vec![];
+        if resp.contains_key("rules") {
+            remote_rules = resp["rules"].as_sequence().unwrap().to_owned();
+        }
+        for v in remote_rules.clone().into_iter() {
+            rules.push(v)
+        }
+
+        // prepend remote rule-providers
+        let mut rule_providers = Mapping::new();
+        if resp.contains_key("rule-providers") {
+            rule_providers = resp["rule-providers"].as_mapping().unwrap().to_owned();
+        }
+        for (k, v) in rule_providers.clone().into_iter() {
+            rule_providers.insert(k, v);
         }
     }
 
-    for v in proxies.clone().into_iter() {
-        new_proxies.push(v)
-    }
+    all.insert("proxies".to_string(), Value::Sequence(proxies));
+    all.insert("rules".to_string(), Value::Sequence(rules));
+    all.insert("rule-providers".to_string(), Value::Mapping(rule_providers));
 
-    map.insert("proxies".to_string(), Value::Sequence(new_proxies));
-
-    // prepend rules
-    let mut rules = vec![];
-    if map.contains_key("rules") {
-        rules = map["rules"].as_sequence().unwrap().to_owned();
-    }
-
-    let mut new_rules = vec![];
-    if !disabled {
-        for rule in config.rules.clone().into_iter() {
-            new_rules.push(Value::String(rule));
-        }
-    }
-
-    for v in rules.clone().into_iter() {
-        new_rules.push(v)
-    }
-
-    map.insert("rules".to_string(), Value::Sequence(new_rules));
-
-    // prepend rule-providers
-    let mut rule_providers = Mapping::new();
-    if map.contains_key("rule-providers") {
-        rule_providers = map["rule-providers"].as_mapping().unwrap().to_owned();
-    }
-
-    let mut new_rule_providers = Mapping::new();
-    if !disabled {
-        for (k, v) in config.rule_providers.clone().into_iter() {
-            new_rule_providers.insert(Value::String(k), Value::Mapping(v.to_map()));
-        }
-    }
-
-    for (k, v) in rule_providers.clone().into_iter() {
-        new_rule_providers.insert(k, v);
-    }
-
-    map.insert("rule-providers".to_string(), Value::Mapping(new_rule_providers));
-
-    let yaml = serde_yaml::to_string(&map).unwrap();
+    let yaml = serde_yaml::to_string(&all).unwrap();
     HttpResponse::Ok().content_type("text/plain; charset=utf-8").body(yaml)
 }
 

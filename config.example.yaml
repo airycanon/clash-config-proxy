@@ -1,6 +1,8 @@
-remote: https://clash.yml
+
 port: 8080
 token: xxx
+sources:
+  - https://clash.yml
 
 proxies:
   - name: xxx

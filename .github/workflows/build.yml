@@ -35,16 +35,17 @@ jobs:
           override: true
 
       - name: Install cross
-        run: cargo install cross
+        run: |
+          cargo install cross
 
       - name: Build ${{ matrix.target }}
         timeout-minutes: 120
         run: |
           cross build --release --target ${{ matrix.target }}
           
-      - name: Build Test
+      - name: Build check
         run: |
-          ls -al target/release/
+          ls -al target/${{ matrix.target }}/release/clash-config-proxy
 
       - name: Package ${{ matrix.target }}
         run: |
@@ -82,25 +83,18 @@ jobs:
 
       - name: Install xcode-select
         if: ${{ matrix.target }} == 'aarch64-apple-darwin'
-        run: |
-          sudo xcode-select -s /Applications/Xcode_12.4.app &&
-          sudo rm -Rf /Library/Developer/CommandLineTools/SDKs/*
-
-      - name: Install GNU tar
-        if: runner.os == 'macOS'
-        run: |
-          brew install gnu-tar
-          # echo "::add-path::/usr/local/opt/gnu-tar/libexec/gnubin"
-          echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
       - name: Build ${{ matrix.target }}
         timeout-minutes: 120
         run: |
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Build Test
+      - name: Build check
         run: |
-          ls -al target/${{ matrix.target }}/release/
+          ls -al target/${{ matrix.target }}/release/clash-config-proxy
 
       - name: Package ${{ matrix.target }}
         run: |

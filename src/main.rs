@@ -20,7 +20,7 @@ pub struct Query {
     disable: Option<bool>,
 }
 
-#[get("/config/{name}")]
+#[get("/configs/{name}")]
 async fn get_config(
     name: web::Path<String>,
     manifest: web::Data<Manifest>,

@@ -13,3 +13,5 @@ serde_yaml = "0.9"
 awc = { version = "3.0.0", features = ["rustls"] }
 diesel = { version = "2.0.0", features = ["sqlite"] }
 dotenvy = "0.15"
+libsqlite3-sys = { version = "*", features = ["bundled"] }
+

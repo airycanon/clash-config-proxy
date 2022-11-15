@@ -1,3 +1,5 @@
 .idea
 /target/
 config.yaml
+config.db
+.DS_store

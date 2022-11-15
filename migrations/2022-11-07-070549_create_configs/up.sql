@@ -1,0 +1,6 @@
+-- Your SQL goes here
+CREATE TABLE configs (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR NOT NULL,
+  url VARCHAR NOT NULL
+)
